@@ -266,3 +266,404 @@ Given a memory request of size `n`,
 - Hardware manages memory access (addition operation of base + offset) and memory verification (making sure offset < limit)
 
 ![lect21-memory_access](.\Graphics\lect21-memory_access.PNG)
+
+**Paging**
+
+<u>Frames:</u> Small, fixed-size memory chunks
+
+<u>Pages:</u> A processes' memory is divided into the same size as frames
+
+- Pages are assigned frames
+- A frame may be empty or have exactly 1 page
+
+
+
+<u>Key Benefit:</u> Frames for a process do not have to be continuous
+
+- Separates logical address with physical address for programmers
+- External fragmentation is completely eliminated
+- Internal fragmentation is very small (at max, each memory request is `full_page - 1`)
+- Process cannot access memory outside of memory space
+
+
+
+<u>Downsides:</u> 
+
+- Each process requires a page table to keep track of which frames the process uses
+- List of free frames is also needed
+
+- See Page 3 for diagram https://learn.uwaterloo.ca/d2l/le/content/391638/viewContent/2170154/View 
+
+
+
+<u>Details:</u>
+
+- Given logical address space with size `2^m` and page size of `2^n`, then
+  - first `m-n` bytes is page number
+  - last `n` bytes is page offset
+- Page sizes are typically the size of disk read/write size
+  - Modern systems have page size of about 4 KB 
+- OS operates on the <u>frame table</u> - a listing of all the frames and the process' page the frame is holding (if any)
+
+**Shared Pages**
+
+- Sharing of pages allow for reduced memory consumption
+  - For example, common parts of Chrome can be shared across all tabs
+- <u>Reentrant</u>: Pure/Stateless
+  - Any code can be shared if it is reentrant
+  - Any function that accesses global / static variables are not reentrant (as they can depend on state)
+
+
+
+**Page Table Structure**
+
+- Page tables are large so they require structuring
+
+1. Hierarchical Paging
+   - Allows for discontinuous pages
+   - Given page number `p`,
+     - first `k` bits is outer page
+     - second `p-k` is inner page
+       - Use inner page to calculate physical address
+   - Only works for 32-bit virtual addresses as the table will be too big for 64-bit
+2. Hashed Page Tables
+   - Hash table with each bucket implemented as a linked list
+3. Inverted Page Tables
+   - Create table with 1 entry per frame (so table size is size of RAM)
+     - Each entry has process and its page number
+   - Con: Require searching the entire table to find relation
+     - However, hardware can make it faster
+
+
+
+**Paging: Hardware Support**
+
+- Page table kept in main memory, registers used to point to page table
+- <u>Downside</u>: Need to retrieve page table and find the frame in entry, then finally access the page
+  - Solution: A caching mechanism using the <u>TLB (translation lookaside buffer)</u> that maps logical addresses to physical addresses
+    - <u>TLB Hit:</u> If page number is found in TLB, then frame is immediately given
+    - <u>TLB Miss</u>: Retrieve page table -> find frame -> store in TLB -> access frame
+
+![lect21-tlb](.\Graphics\lect21-tlb.PNG)
+
+### Lecture 22 - Caching
+
+<u>Line</u>: an entry in cache
+
+- caches have fixed-size blocks
+
+Cache Hit vs. Cache Miss
+
+- Page miss is aka <u>page fault</u>
+
+Effective Access Time:
+
+![lect22-access_time](.\Graphics\lect22-access_time.PNG)
+
+- hit ratio is how often we get cache hit
+
+
+
+Cache Levels: L1, L2, L3
+
+- From smaller -> largest, which is also fastest -> slowest
+- If miss in L1 and hit in L2, then entry is copied from L2 to L1
+
+
+
+**Page Replacement Algorithms**
+
+- if page fault, which page entry to <u>evict</u> (aka replace) in cache
+
+Important Observations about Memory Access
+
+1. 10% of source code is executed 90% of the time
+2. <u>Temporal Locality:</u> Recently accessed location is likely to be accessed again
+3. <u>Spatial Locality:</u> Memory location nearby recently accessed location is more likely to be accessed
+
+- If page has been altered in cache, we can delay writing to main memory when entry is evicted IF page is not shared
+
+
+
+<u>Important</u>: Should priortize replacing a page entry in cache that has not been modified to save time writing to main memory
+
+
+
+<u>Optimal Algorithm</u>
+
+- The best algorithm possible is to replace the page that will be used most distantly in future
+- Impossible to implement (can't see into future)
+- Used as benchmark for other algorithms
+
+
+
+<u>Not-Recently-Used</u>
+
+- Each page has two status bits
+  1. `R` == referenced bit == set when page is read or written to
+  2. `M` == modified bit == set when page is written to
+- `R` is periodically cleared to 0
+- Ordering for Replacement
+  1. Not Referenced, Not Modified
+  2. Not Referenced, Modified
+  3. Referenced, Not Modified
+  4. Referenced, Modified
+
+<u>FIFO</u>
+
+- Replace oldest frame
+- Have a counter that points to frame to be replaced
+  - Increment by 1 to next frame to be replaced
+- Downside: doesn't take into consideration how often frame is used
+
+
+
+<u>Second Chance (Clock Algorithm)</u>
+
+- Similar to FIFO but if page entry has `R == 1`, then clear R and continue to next oldest
+- Even if all page entries have `R == 1`, then the initial oldest page will still be removed
+
+
+
+<u>Least-Recently-Used (LRU)</u>
+
+- Doubly linked list, in order from most-recently-used to least-recently-used
+- If a page is used, move entry to back of list
+- If page fault, then remove the head of list
+- Theta(1) runtime
+
+
+
+<u>Not Frequently Used (NFU)</u>
+
+- Each page gets associated software counter
+- Whenever page is referenced, add to counter
+- <u>Aging:</u> A method to decline count over time
+  - Counters are periodically right-shifted
+  - An "add" to counter is setting the leftmost bit as `1`
+- Downside: does lose history if two pages have same counter
+
+
+
+<u>Pre-Paging</u>
+
+- pre-populate cache by guessing pages needed using temporal and spatial locality
+- useful when program is newly started or just recently swapped from memory
+
+
+
+<u>Verdict (in order of efficiency)</u>
+
+1. LRU (given that hardware is available to support it)
+   - hard to implement
+2. NFU + Aging
+3. NFU
+4. Everything else is relatively suboptimal
+
+
+
+**Local and Global Algorithms**
+
+- replace pages used by the process (local) or any pages (global)
+  - smaller caches have to use global replacements for efficiency
+- global algorithms == dynamic allocation == better
+  - local algorithms == fixed allocation == wasted cache space
+- keep track of page faults using <u>Page Fault Frequency (PFF)</u> to determine if a process has enough allocated cache space
+  - Using PFF assumes that processes will have fewer page faults if given more cache
+    - Works for LRU algo but not FIFO
+
+
+
+### Lecture 23 + 24 - Virtual Memory
+
+- physical memory may not be enough memory
+  - a program that uses large datasets from server
+  - sum of memory requirements from multiple running programs
+
+Solution: Running programs partly in memory, partly on disk
+
+- Use memory as a "cache" for disk
+  - If a page is not found in main memory, we have a <u>page fault</u> and a page in main memory will be evicted by a page from disk
+  - Page replacement algorithm needed
+  - <u>Demand Paging</u>:  A page is loaded into memory only if it is referenced or needed
+
+![lect23-virtual_memory_mapping](.\Graphics\lect23-virtual_memory_mapping.PNG)
+
+- Pros:
+  - Program no longer constrained by size of physical memory
+  - Each program uses less physical memory, allowing more processes to run concurrently
+  - Less I/O is needed to swap user programs
+
+
+
+<u>Thrashing:</u> OS spends too much time swapping pages in/out of memory so very little actual work gets done
+
+
+
+**6 Step Process of Memory Reference w/ Swapping:**
+
+1. Check if memory reference is valid or invalid
+   - Terminate if invalid
+2. Check if page reference is in main memory. Assume reference is not in memory.
+3. If page fault, find free frame in main memory (or evict some other page)
+4. Disk read (or write) of new page
+5. Update records to show new page is in main memory
+6. Restart instruction that referenced page
+   - To allow for restart of any instruction, the state of the process (eg. register values) must be saved when page fault occurs
+   - <u>Problem</u>: Instructions where source and destination overlap may not be easily restarted
+     - e.g. `c = ++c + 5;`
+     - Solution 1: Check source, destination address before running operation
+     - Solution 2: Have temporary registers hold values and store values on page fault
+
+![lect23-memory_swapping](.\Graphics\lect23-memory_swapping.PNG)
+
+
+
+Important Note: It is possible for page to be a WRITE
+
+- For example, for `C = A + B` , if the page that stores `C` is not in memory, then we need to fetch page for `C` and restart entire addition operation
+
+
+
+**Virtual Memory Performance**
+
+- ![lect23-virtual_memory_performance](.\Graphics\lect23-virtual_memory_performance.PNG)
+  - h is hit rate for cache
+  - p is hit rate for main memory
+  - tc is access time for cache
+  - tm is access time for main memory
+  - td is access time for disk
+  - Since td is order of magnitudes larger than other times, `(1-p) * td` is dominating term
+- For files, system usually has a "swap file", which is a partition of hard drive
+  - System will swap entire file into memory as it is faster
+
+**Handling Page Fault** - IS THIS NECESSARY???
+
+1. Send trap to OS
+2. Save user registers and process states
+3. Identify interrupt as page fault
+4. Verify page reference.
+   - If valid, determine location of page on disk
+   - If invalid, terminate program
+5. Identify frame for page (using replacement algorithm)
+6. Check if frame has been modified
+   - If yes, write modified page to disk
+     - Receive interrupt when disk write has completed
+     - Resave registers as CPU was doing something else during disk write
+     - Update page tables and mark frame as free
+7. Issue disk read
+   - CPU does something else in meantime
+8. Receive interrupt when disk read is completed
+   - Save registers and states if CPU was doing something else
+9. Update page tables
+10. Restore values and state and restart interrupted instruction
+
+
+
+**Copy-on-Write**
+
+- UNIX systems uses <u>copy-on-write technique</u>
+- When UNIX system processes `fork()`, the pages are shared but marked with "copy-on-write"
+- When either the parent or child attempts to modify a shared page, a copy of the page is made
+- `vfork()` skips copy-on-write technique by immediately suspending parent process
+  - Dangerous as modifications to pages done in child will be visible by parent
+  - Efficient if are going to run `exec()` in parent anyways and get new memory space
+
+
+
+**Allocation of Frames**
+
+- designate a few frames to always be free
+  - offers us the ability to save time as we don't have to write page that was occupying the frame
+- create a minimum number of frames for processes 
+  - e.g. if instruction and addresses were in 2 pages, then 1 frame is not enough
+  - e.g. if each instruction has an indirect address, this could cause infinite nesting (aka stack overflow)
+    - as a result, we need to limit the levels of indirection
+    - if levels of indirection == 16, then worst case scenario requires 17 pages minimum
+
+
+
+**Frame Allocation Algorithms**
+
+- Assume there are `m` frames, `k` of which is used by OS. Thus, `m-k` frames available
+
+
+
+<u>Equal Allocation</u>
+
+- Given `n` processes, each process gets `(m-k)/n` frames
+- Leftover frames can be used as pool of free frames (see above)
+- <u>Downside</u>: Does not take into account how many frames the program actually needs
+
+
+
+<u>Proportional Allocation</u>
+
+- If each process `Pi` has a virtual memory size of `Si` , and `S` is the sum of all virtual memory sizes, then each process gets `Si/S * (m-k)` frames
+- Frames need to be an integer value and above minimum, and sum of all frames must be less than `(m-k)`
+- <u>Downside</u>: Does not consider priority of processes
+
+
+
+<u>Local and Global Replacement</u>
+
+- With a global replacement algorithm, the process the runs the most will acquire the most pages
+- Requires overhead to ensure no process falls below minimum number of pages OR swap entire process to disk when pages go below minimum
+
+
+
+**Thrashing**
+
+- Background: basic CPUs will start and bring in more processes into memory when CPU utilization is low
+- However, when a process runs into a high number of page faults, this process takes other process' pages. But then those processes can't run
+- Since no processes are running, the CPU utilization is low so more programs are brought in == **fatal error**
+- This example demonstrates **the CPU usage alone is a bad indicator for determining if more or fewer processes need to be running**
+
+
+
+<u>Solution 1: Change to local replacement</u>
+
+- Pro:  Process with page faults will not steal pages from other processes
+- Con: Process with page faults is still hogging disk time
+
+<u>Solution 2: Track number of page faults</u>
+
+- Pro: Tells us if too many processes are in memory
+- Con: Reactive solution
+
+
+
+**Solution 3: Working-Set Model**
+
+- Allocating enough frames for a process's locality and take advantage of temporal and spatial locality
+  - The process will eventually leave locality -- unavoidable
+
+
+
+First, the OS will determine an appropriate `n` for the process
+
+- The last `n` most recently accessed pages are stored in the <u>working-set</u> and represent the locale of the program
+  - If the last `n` accesses were all in page `k`, then the working-set will only have 1 page
+- If `n` is too large, then it will cover too many locales.
+  - Fewer processes will be allowed to run
+- If `n` is too small, then it will not encompass the entire locale 
+  - More page faults
+
+
+
+`Sum of all working sets < (m-k)`
+
+- If `sum > (m-k)` , the OS will know that the system is overloaded and remove a process to prevent thrashing
+- If `sum << (m-k)`, the system is underloaded and more processes can start
+
+
+
+**Page Fault Behaviour**
+
+- Program Start: High page fault rate
+- Established First Locale: Low
+- Move to New Locale: High
+- Settled in New Locale: Low
+
+![lect24-memory_locales](.\Graphics\lect24-memory_locales.PNG)
+
