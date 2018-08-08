@@ -185,6 +185,7 @@
 4. <u>SCAN Scheduling</u>
    - aka. elevator algorithm
    - Move from cylinder 1 to 199 and then reverse direction
+   - NOTE: All the way to the end!
    - Pros:
      - no starvation
    - Cons:
@@ -686,6 +687,128 @@ Each object has defined operations (read, write, open, flush, release)
 
 
 ### Lecture 35 - Virtualization (Virtual Machines)
+
+**Description**
+
+<u>Host</u>: underlying hardware system
+
+<u>Virtual Machine Manager (VMM)</u> - creates an interface similar to <u>host</u> but can have multiple copies
+
+- also called <u>hypervisor</u>
+
+<u>Guests</u> - VMs that interact with their own virtual copy of the host
+
+- As a result, each guest can have their own operating system
+
+![lect35-VMs](.\Graphics\lect35-VMs.PNG)
+
+
+
+
+
+<u>Emulator</u>: different than VMs
+
+- An Android emulator simulate Android hardware
+- On the other hand, Windows or Linux can run on the x86_64 hardware architecture
+- Incredibly slow
+
+
+
+**Uses**
+
+1. Supports legacy software
+2. Suspension of VM
+   - Can pause, save and restore state
+   - Allows the state to be moved from one machine to another
+3. Protection
+   - Guests are isolated from the host and vice-versa
+   - Rollback or deleting guests are easy
+4. Consolidation in Data Centers
+   - Virtual servers makes it easy to shift it around in the data center
+
+
+
+**Behind the Scenes**
+
+<u>Virtual CPU</u> - data structure that reports the state of CPU
+
+- maintained by VMM
+
+
+
+<u>Virtual User and Kernel Mode</u> - the guest is always on user mode so require a virtual kernel mode
+
+- <u>Trap-and Emulate</u> - The guest generates a trap when attempting privileged instruction. Picked up by VMM
+  - Hardware designers have reduced overhead by adding more modes in CPU (e.g. virtual user and virtual kernel mode)
+
+
+
+<u>Special Instructions</u> - computer instructions that require special handling as they do not generate traps (e.g. `POPF`)
+
+- Solution: <u>binary translation</u> - VCPU runs commands on virtual user and kernel mode and VMM looks at incoming instructions and directly translate them into corresponding CPU mode
+
+
+
+**Impact**
+
+<u>Scheduling</u>
+
+1. Number of VCPUs < Number of CPUs
+   - One-to-one mapping
+2. Number of VCPUs == Number of CPUs
+   - One-to-one mapping with VMM "stealing" cycles evenly on CPUs
+3. Number of VCPUs > Number of CPUs
+   - VMM requires scheduling strategy to schedule VCPUs
+   - Problem: Deadlines and time slices are no longer accurate on VCPU
+
+
+
+<u>Memory Management</u>
+
+- more RAM used to host multiple OSes and other structures
+
+
+
+Solutions:
+
+1. <u>Nested Page Tables</u>
+
+   - VMM has nested page table (1 page table per VM)
+   - Con: VMM does not know guest's memory patterns so inefficient
+
+2. <u>Device Driver</u>
+
+   - VMM installs device driver into guest
+
+     "Balloon" pages are created to indicate memory usage, but can be easily allocated and deallocated
+
+3. <u>Duplicate Detection</u>
+
+   - VMM detects for identical pages (which is common when VMs are using same OS)
+   - To modify a share page, a copy is made 
+
+4. <u>Input/Output</u>
+
+   - A device is either given to one VM or the VMM provides virtual drivers to VM
+
+5. <u>Disk</u>
+
+   - <u>Disk Image</u> - a file that contains all the contents of the root disk guest
+
+<u>Live Migration</u>
+
+- VMs allow user's virtual machine to migrate live without major impact
+
+Steps:
+
+1. Source VMM connects to destination VMM
+2. Destination VMM creates new guest
+3. Source sends all read-only memory pages
+4. Source sends all read-write pages
+5. Pages that were modified in meantime are sent
+6. Source may freeze guest and send the state and "dirty" pages
+7. Destination sends ACK and starts guest
+8. Source terminates
 
 
 

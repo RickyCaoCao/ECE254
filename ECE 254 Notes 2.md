@@ -90,7 +90,7 @@
 
 
 
-### Lecture 14 - Classic Synchronization Problemss
+### Lecture 14 - Classic Synchronization Problems
 
 - Classic problems can be used to test new synchronization or coordination scheme
 
@@ -220,9 +220,9 @@ All 4 conditions must satisfy in order to get deadlock
    - Some systems such as Windows are implemented like this
    - Bad
 2. <u>Deadlock Prevention</u>
-   - Mutual Exclusion
+   - **Mutual Exclusion**
      - cannot disallow mutexs as it is needed to prevent errors
-   - Hold and Wait
+   - **Hold and Wait**
      - Must ensure that a process holding a resource cannot request another resource in middle of execution
      - Solution 1 - Request all resources at beginning of program
        - Problem: Processes don't know how much resources it needs at beginning of process (e.g. text editor)
@@ -235,7 +235,7 @@ All 4 conditions must satisfy in order to get deadlock
        - Problem: Not applicable to our model of semaphores as it wouldn't know the value of semaphore without `wait` call
          - However, calling `wait` could block the process, and it can no longer release locks
          - Only specific systems that support non-blocking requests for resources and semaphores can handle this problem
-   - No Preemption
+   - **No Preemption**
      - Allow forcible removal of resources from a process
      - Problem: resources must not be memory as process state will be lost
 3. Deadlock Avoidance
